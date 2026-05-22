@@ -1,0 +1,59 @@
+# Distributed Shared Whiteboard Implementation Plan
+
+## Summary
+Build the assignment as a standard Java desktop app using Swing for the GUI and TCP sockets for networking. Use a single central server as the source of truth. `CreateWhiteBoard <serverIPAddress> <serverPort> username` starts the server and joins as manager; `JoinWhiteBoard <serverIPAddress> <serverPort> username` connects as a normal peer.
+
+## Phase 1: Core Whiteboard
+- Create a Swing UI with a central drawing canvas, toolbar, color selector with at least 16 colors, stroke-size selector, user list, chat panel, and manager-only file/admin controls.
+- Implement drawing tools: free draw, eraser, line, rectangle, circle/oval, triangle, and text placement.
+- Represent canvas content as serializable drawing objects: type, coordinates, stroke color, stroke width, fill/text data where needed.
+- Render the canvas from an ordered list of drawing objects rather than drawing directly onto a bitmap, so state can be synchronized and saved.
+
+## Phase 2: Networking And State
+- Use TCP sockets with `ObjectInputStream`/`ObjectOutputStream` messages.
+- Keep all authoritative state on the server: users, manager ID, accepted clients, chat history, and drawing elements.
+- Define message types: `JOIN_REQUEST`, `JOIN_APPROVED`, `JOIN_REJECTED`, `STATE_SNAPSHOT`, `DRAW_EVENT`, `CHAT_MESSAGE`, `USER_LIST`, `KICK_USER`, `USER_LEFT`, `NEW_BOARD`, `SAVE_BOARD`, `OPEN_BOARD`, `CLOSE_BOARD`, `SERVER_SHUTDOWN`, and `ERROR`.
+- Server assigns sequence numbers to drawing events, appends them to state, then broadcasts them to every connected client.
+- New clients receive the full current snapshot after manager approval.
+
+## Phase 3: User Management
+- Enforce unique usernames on join.
+- When a peer joins, show the manager an approval dialog before adding the peer.
+- Maintain and broadcast the online user list after joins, leaves, kicks, and disconnects.
+- Let normal users leave voluntarily.
+- Let the manager kick any peer; kicked users receive a message and their client exits or disconnects.
+- When the manager closes the board, broadcast shutdown and terminate all peer sessions.
+
+## Phase 4: Advanced Features
+- Add chat messages through the same socket connection and broadcast them to all users.
+- Add manager-only `File` menu actions:
+  - `New`: clear canvas state and broadcast an empty board.
+  - `Open`: load a saved board file on the manager/server machine and broadcast the snapshot.
+  - `Save`: save to current file path.
+  - `Save As`: choose a new file path and save.
+  - `Close`: shut down the shared whiteboard for everyone.
+- Store saved whiteboards as serialized `WhiteboardState` files.
+
+## Suggested Package Structure
+- `app`: `CreateWhiteBoard`, `JoinWhiteBoard`
+- `server`: `WhiteboardServer`, `ClientHandler`, `ServerState`
+- `client`: `WhiteboardClient`, client listener thread
+- `model`: `WhiteboardState`, `UserInfo`, `DrawingElement`, shape subclasses, chat message
+- `protocol`: serializable request/response message classes
+- `ui`: main frame, drawing canvas, toolbar, chat panel, user list panel, manager dialogs
+
+## Testing Plan
+- Compile with `javac` and run both startup commands locally.
+- Test one manager and at least two peers.
+- Verify drawing synchronization for every tool.
+- Verify new peers receive the existing drawing state.
+- Verify username uniqueness and manager approval/rejection.
+- Verify chat broadcast.
+- Verify save, save-as, open, new, and close are manager-only.
+- Verify kick removes only the selected user and updates all peer lists.
+- Verify manager close notifies and disconnects all peers.
+
+## Assumptions
+- Use Java 21-compatible code even though the IntelliJ project currently references a newer JDK.
+- Use only standard Java libraries: Swing, Java2D, TCP sockets, serialization, and file I/O.
+- Prefer a central-server design over peer-to-peer because it makes synchronization, joins, file control, and manager permissions much simpler and easier to grade.
