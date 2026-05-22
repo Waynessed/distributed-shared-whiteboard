@@ -5,8 +5,10 @@ import model.DrawingTool;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
@@ -14,6 +16,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class WhiteBoardFrame extends JFrame {
     private static final Color[] PALETTE = {
@@ -24,6 +28,10 @@ public class WhiteBoardFrame extends JFrame {
     };
 
     private final DrawingCanvas canvas = new DrawingCanvas();
+    private final DefaultListModel<String> userListModel = new DefaultListModel<>();
+    private final JList<String> userList = new JList<>(userListModel);
+    private final JButton kickButton = new JButton("Kick User");
+    private Consumer<String> kickListener;
 
     public WhiteBoardFrame() {
         this("Standalone Shared Whiteboard - Phase 1A", true);
@@ -36,6 +44,7 @@ public class WhiteBoardFrame extends JFrame {
 
         add(createToolBar(showClearButton), BorderLayout.NORTH);
         add(new JScrollPane(canvas), BorderLayout.CENTER);
+        add(createUserPanel(), BorderLayout.EAST);
         add(createColorPanel(), BorderLayout.SOUTH);
 
         pack();
@@ -44,6 +53,21 @@ public class WhiteBoardFrame extends JFrame {
 
     public DrawingCanvas getCanvas() {
         return canvas;
+    }
+
+    public void setUsers(List<String> users) {
+        userListModel.clear();
+        for (String user : users) {
+            userListModel.addElement(user);
+        }
+    }
+
+    public void setManagerMode(boolean managerMode) {
+        kickButton.setEnabled(managerMode);
+    }
+
+    public void setKickListener(Consumer<String> kickListener) {
+        this.kickListener = kickListener;
     }
 
     private JToolBar createToolBar(boolean showClearButton) {
@@ -82,6 +106,25 @@ public class WhiteBoardFrame extends JFrame {
         }
 
         return toolbar;
+    }
+
+    private JPanel createUserPanel() {
+        JPanel panel = new JPanel(new BorderLayout(4, 4));
+        panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        panel.setPreferredSize(new Dimension(150, 0));
+
+        kickButton.setEnabled(false);
+        kickButton.addActionListener(event -> {
+            String selectedUser = userList.getSelectedValue();
+            if (selectedUser != null && kickListener != null) {
+                kickListener.accept(selectedUser);
+            }
+        });
+
+        panel.add(new JLabel("Online Users"), BorderLayout.NORTH);
+        panel.add(new JScrollPane(userList), BorderLayout.CENTER);
+        panel.add(kickButton, BorderLayout.SOUTH);
+        return panel;
     }
 
     private JPanel createColorPanel() {

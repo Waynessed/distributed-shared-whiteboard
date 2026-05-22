@@ -33,7 +33,7 @@ public class CreateWhiteBoard {
 
     private static void openClientWindow(String host, int port, String username, String role) {
         WhiteBoardFrame frame = new WhiteBoardFrame("Whiteboard - " + username + " (" + role + ")", false);
-        WhiteboardClient client = new WhiteboardClient(username, frame.getCanvas());
+        WhiteboardClient client = new WhiteboardClient(username, frame);
         try {
             client.connect(host, port);
             frame.setVisible(true);

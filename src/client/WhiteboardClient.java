@@ -4,6 +4,7 @@ import model.DrawingElement;
 import protocol.MessageType;
 import protocol.WhiteboardMessage;
 import ui.DrawingCanvas;
+import ui.WhiteBoardFrame;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -15,14 +16,17 @@ import java.net.Socket;
 
 public class WhiteboardClient {
     private final String username;
+    private final WhiteBoardFrame frame;
     private final DrawingCanvas canvas;
     private Socket socket;
     private ObjectOutputStream output;
     private ObjectInputStream input;
+    private volatile boolean closing;
 
-    public WhiteboardClient(String username, DrawingCanvas canvas) {
+    public WhiteboardClient(String username, WhiteBoardFrame frame) {
         this.username = username;
-        this.canvas = canvas;
+        this.frame = frame;
+        this.canvas = frame.getCanvas();
     }
 
     public void connect(String host, int port) throws IOException {
@@ -32,7 +36,7 @@ public class WhiteboardClient {
         input = new ObjectInputStream(socket.getInputStream());
 
         send(WhiteboardMessage.join(username));
-        canvas.setDrawingListener(this::sendDrawing);
+        frame.setKickListener(this::kickUser);
 
         Thread listenerThread = new Thread(this::listenForMessages, "whiteboard-client-listener");
         listenerThread.setDaemon(true);
@@ -48,21 +52,59 @@ public class WhiteboardClient {
                 }
             }
         } catch (EOFException exception) {
-            showError("Disconnected from the server.");
+            if (!closing) {
+                showError("Disconnected from the server.");
+            }
         } catch (IOException | ClassNotFoundException exception) {
-            showError("Network error: " + exception.getMessage());
+            if (!closing) {
+                showError("Network error: " + exception.getMessage());
+            }
         }
     }
 
     private void handleMessage(WhiteboardMessage message) {
-        if (message.getType() == MessageType.STATE) {
+        if (message.getType() == MessageType.JOIN_ACCEPTED) {
+            SwingUtilities.invokeLater(() -> {
+                canvas.setDrawingListener(this::sendDrawing);
+                frame.setManagerMode(message.isManager());
+            });
+        } else if (message.getType() == MessageType.JOIN_REJECTED) {
+            showError(message.getText());
+            close();
+            SwingUtilities.invokeLater(frame::dispose);
+        } else if (message.getType() == MessageType.STATE) {
             SwingUtilities.invokeLater(() -> canvas.setElements(message.getDrawingState()));
         } else if (message.getType() == MessageType.DRAW) {
             DrawingElement element = message.getDrawingElement();
             SwingUtilities.invokeLater(() -> canvas.addRemoteElement(element));
+        } else if (message.getType() == MessageType.USER_LIST) {
+            SwingUtilities.invokeLater(() -> frame.setUsers(message.getUsers()));
+        } else if (message.getType() == MessageType.APPROVAL_REQUEST) {
+            askManagerForApproval(message.getUsername());
+        } else if (message.getType() == MessageType.KICKED) {
+            showError(message.getText());
+            close();
+            SwingUtilities.invokeLater(frame::dispose);
         } else if (message.getType() == MessageType.ERROR) {
             showError(message.getText());
         }
+    }
+
+    private void askManagerForApproval(String requestedUsername) {
+        SwingUtilities.invokeLater(() -> {
+            int answer = JOptionPane.showConfirmDialog(
+                    frame,
+                    requestedUsername + " wants to join your whiteboard. Allow?",
+                    "Join Request",
+                    JOptionPane.YES_NO_OPTION
+            );
+            boolean approved = answer == JOptionPane.YES_OPTION;
+            try {
+                send(WhiteboardMessage.approvalResponse(requestedUsername, approved));
+            } catch (IOException exception) {
+                showError("Could not send approval response: " + exception.getMessage());
+            }
+        });
     }
 
     private void sendDrawing(DrawingElement element) {
@@ -79,9 +121,31 @@ public class WhiteboardClient {
         output.reset();
     }
 
+    private void kickUser(String usernameToKick) {
+        if (username.equals(usernameToKick)) {
+            showError("The manager cannot kick themselves.");
+            return;
+        }
+        try {
+            send(WhiteboardMessage.kick(usernameToKick));
+        } catch (IOException exception) {
+            showError("Could not send kick request: " + exception.getMessage());
+        }
+    }
+
+    private void close() {
+        closing = true;
+        try {
+            if (socket != null) {
+                socket.close();
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
     private void showError(String message) {
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
-                canvas,
+                frame,
                 message,
                 "Whiteboard Connection",
                 JOptionPane.ERROR_MESSAGE

@@ -17,7 +17,7 @@ public class JoinWhiteBoard {
 
         SwingUtilities.invokeLater(() -> {
             WhiteBoardFrame frame = new WhiteBoardFrame("Whiteboard - " + username, false);
-            WhiteboardClient client = new WhiteboardClient(username, frame.getCanvas());
+            WhiteboardClient client = new WhiteboardClient(username, frame);
             try {
                 client.connect(host, port);
                 frame.setVisible(true);
