@@ -24,6 +24,7 @@ public class WhiteboardServer implements Runnable {
     private final int port;
     private final Object stateLock = new Object();
     private final List<DrawingElement> drawingState = new ArrayList<>();
+    private final List<String> chatHistory = new ArrayList<>();
     private final List<ClientHandler> clients = new ArrayList<>();
     private final Map<String, PendingJoin> pendingJoins = new HashMap<>();
     private ClientHandler manager;
@@ -82,6 +83,7 @@ public class WhiteboardServer implements Runnable {
 
     private void handleChat(WhiteboardMessage message) {
         synchronized (stateLock) {
+            chatHistory.add(message.getUsername() + ": " + message.getText());
             broadcast(WhiteboardMessage.chat(message.getUsername(), message.getText()));
         }
     }
@@ -114,6 +116,7 @@ public class WhiteboardServer implements Runnable {
 
             drawingState.clear();
             broadcast(WhiteboardMessage.state(drawingState));
+            chatHistory.add("System: The manager created a new whiteboard.");
             broadcast(WhiteboardMessage.chat("System", "The manager created a new whiteboard."));
         }
     }
@@ -286,6 +289,7 @@ public class WhiteboardServer implements Runnable {
                     clients.add(this);
                     send(WhiteboardMessage.joinAccepted(true));
                     send(WhiteboardMessage.state(drawingState));
+                    send(WhiteboardMessage.chatHistory(chatHistory));
                     broadcastUserList();
                     return true;
                 }
@@ -317,6 +321,7 @@ public class WhiteboardServer implements Runnable {
                 clients.add(this);
                 send(WhiteboardMessage.joinAccepted(false));
                 send(WhiteboardMessage.state(drawingState));
+                send(WhiteboardMessage.chatHistory(chatHistory));
                 broadcastUserList();
                 return true;
             }

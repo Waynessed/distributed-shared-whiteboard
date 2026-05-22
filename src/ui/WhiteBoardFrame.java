@@ -48,6 +48,7 @@ public class WhiteBoardFrame extends JFrame {
     private Runnable openBoardListener;
     private Runnable saveBoardListener;
     private Runnable saveAsBoardListener;
+    private Runnable exportImageListener;
     private Runnable closeBoardListener;
     private Runnable quitListener;
 
@@ -107,12 +108,14 @@ public class WhiteBoardFrame extends JFrame {
             Runnable openBoardListener,
             Runnable saveBoardListener,
             Runnable saveAsBoardListener,
+            Runnable exportImageListener,
             Runnable closeBoardListener
     ) {
         this.newBoardListener = newBoardListener;
         this.openBoardListener = openBoardListener;
         this.saveBoardListener = saveBoardListener;
         this.saveAsBoardListener = saveAsBoardListener;
+        this.exportImageListener = exportImageListener;
         this.closeBoardListener = closeBoardListener;
     }
 
@@ -123,6 +126,13 @@ public class WhiteBoardFrame extends JFrame {
     public void addChatMessage(String message) {
         chatArea.append(message + System.lineSeparator());
         chatArea.setCaretPosition(chatArea.getDocument().getLength());
+    }
+
+    public void setChatHistory(List<String> messages) {
+        chatArea.setText("");
+        for (String message : messages) {
+            addChatMessage(message);
+        }
     }
 
     private JToolBar createToolBar(boolean showClearButton) {
@@ -170,6 +180,7 @@ public class WhiteBoardFrame extends JFrame {
         addMenuItem("Open", () -> runIfSet(openBoardListener));
         addMenuItem("Save", () -> runIfSet(saveBoardListener));
         addMenuItem("Save As", () -> runIfSet(saveAsBoardListener));
+        addMenuItem("Export PNG", () -> runIfSet(exportImageListener));
         addMenuItem("Close", () -> runIfSet(closeBoardListener));
         menuBar.add(fileMenu);
         return menuBar;

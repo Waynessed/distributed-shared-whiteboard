@@ -52,6 +52,18 @@ public class DrawingElement implements Serializable {
         return Collections.unmodifiableList(points);
     }
 
+    public Color getColor() {
+        return color;
+    }
+
+    public int getStrokeSize() {
+        return strokeSize;
+    }
+
+    public String getText() {
+        return text;
+    }
+
     public void addPoint(Point point) {
         points.add(point);
     }

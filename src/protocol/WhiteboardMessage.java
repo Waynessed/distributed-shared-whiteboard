@@ -15,6 +15,7 @@ public class WhiteboardMessage implements Serializable {
     private final DrawingElement drawingElement;
     private final List<DrawingElement> drawingState;
     private final List<String> users;
+    private final List<String> chatHistory;
     private final boolean approved;
     private final boolean manager;
 
@@ -25,6 +26,7 @@ public class WhiteboardMessage implements Serializable {
             DrawingElement drawingElement,
             List<DrawingElement> drawingState,
             List<String> users,
+            List<String> chatHistory,
             boolean approved,
             boolean manager
     ) {
@@ -34,72 +36,77 @@ public class WhiteboardMessage implements Serializable {
         this.drawingElement = drawingElement;
         this.drawingState = drawingState == null ? null : new ArrayList<>(drawingState);
         this.users = users == null ? null : new ArrayList<>(users);
+        this.chatHistory = chatHistory == null ? null : new ArrayList<>(chatHistory);
         this.approved = approved;
         this.manager = manager;
     }
 
     public static WhiteboardMessage join(String username) {
-        return new WhiteboardMessage(MessageType.JOIN, username, null, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.JOIN, username, null, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage leave(String username) {
-        return new WhiteboardMessage(MessageType.LEAVE, username, null, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.LEAVE, username, null, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage joinAccepted(boolean manager) {
-        return new WhiteboardMessage(MessageType.JOIN_ACCEPTED, null, null, null, null, null, true, manager);
+        return new WhiteboardMessage(MessageType.JOIN_ACCEPTED, null, null, null, null, null, null, true, manager);
     }
 
     public static WhiteboardMessage joinRejected(String reason) {
-        return new WhiteboardMessage(MessageType.JOIN_REJECTED, null, reason, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.JOIN_REJECTED, null, reason, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage state(List<DrawingElement> drawingState) {
-        return new WhiteboardMessage(MessageType.STATE, null, null, null, drawingState, null, false, false);
+        return new WhiteboardMessage(MessageType.STATE, null, null, null, drawingState, null, null, false, false);
     }
 
     public static WhiteboardMessage draw(String username, DrawingElement drawingElement) {
-        return new WhiteboardMessage(MessageType.DRAW, username, null, drawingElement, null, null, false, false);
+        return new WhiteboardMessage(MessageType.DRAW, username, null, drawingElement, null, null, null, false, false);
     }
 
     public static WhiteboardMessage chat(String username, String text) {
-        return new WhiteboardMessage(MessageType.CHAT, username, text, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.CHAT, username, text, null, null, null, null, false, false);
+    }
+
+    public static WhiteboardMessage chatHistory(List<String> chatHistory) {
+        return new WhiteboardMessage(MessageType.CHAT_HISTORY, null, null, null, null, null, chatHistory, false, false);
     }
 
     public static WhiteboardMessage newBoard() {
-        return new WhiteboardMessage(MessageType.NEW_BOARD, null, null, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.NEW_BOARD, null, null, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage userList(List<String> users) {
-        return new WhiteboardMessage(MessageType.USER_LIST, null, null, null, null, users, false, false);
+        return new WhiteboardMessage(MessageType.USER_LIST, null, null, null, null, users, null, false, false);
     }
 
     public static WhiteboardMessage approvalRequest(String username) {
-        return new WhiteboardMessage(MessageType.APPROVAL_REQUEST, username, null, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.APPROVAL_REQUEST, username, null, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage approvalResponse(String username, boolean approved) {
-        return new WhiteboardMessage(MessageType.APPROVAL_RESPONSE, username, null, null, null, null, approved, false);
+        return new WhiteboardMessage(MessageType.APPROVAL_RESPONSE, username, null, null, null, null, null, approved, false);
     }
 
     public static WhiteboardMessage kick(String username) {
-        return new WhiteboardMessage(MessageType.KICK, username, null, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.KICK, username, null, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage kicked(String reason) {
-        return new WhiteboardMessage(MessageType.KICKED, null, reason, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.KICKED, null, reason, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage replaceBoard(List<DrawingElement> drawingState) {
-        return new WhiteboardMessage(MessageType.REPLACE_BOARD, null, null, null, drawingState, null, false, false);
+        return new WhiteboardMessage(MessageType.REPLACE_BOARD, null, null, null, drawingState, null, null, false, false);
     }
 
     public static WhiteboardMessage serverShutdown(String reason) {
-        return new WhiteboardMessage(MessageType.SERVER_SHUTDOWN, null, reason, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.SERVER_SHUTDOWN, null, reason, null, null, null, null, false, false);
     }
 
     public static WhiteboardMessage error(String text) {
-        return new WhiteboardMessage(MessageType.ERROR, null, text, null, null, null, false, false);
+        return new WhiteboardMessage(MessageType.ERROR, null, text, null, null, null, null, false, false);
     }
 
     public MessageType getType() {
@@ -124,6 +131,10 @@ public class WhiteboardMessage implements Serializable {
 
     public List<String> getUsers() {
         return users == null ? List.of() : new ArrayList<>(users);
+    }
+
+    public List<String> getChatHistory() {
+        return chatHistory == null ? List.of() : new ArrayList<>(chatHistory);
     }
 
     public boolean isApproved() {

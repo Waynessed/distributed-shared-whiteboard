@@ -1,6 +1,7 @@
 package client;
 
 import model.DrawingElement;
+import model.WhiteboardFileCodec;
 import model.WhiteboardState;
 import protocol.MessageType;
 import protocol.WhiteboardMessage;
@@ -10,10 +11,12 @@ import ui.WhiteBoardFrame;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -53,6 +56,7 @@ public class WhiteboardClient {
                 this::openBoard,
                 this::saveBoard,
                 this::saveBoardAs,
+                this::exportPng,
                 this::closeBoard
         );
 
@@ -98,6 +102,8 @@ public class WhiteboardClient {
             SwingUtilities.invokeLater(() -> canvas.addRemoteElement(element));
         } else if (message.getType() == MessageType.CHAT) {
             SwingUtilities.invokeLater(() -> frame.addChatMessage(message.getUsername() + ": " + message.getText()));
+        } else if (message.getType() == MessageType.CHAT_HISTORY) {
+            SwingUtilities.invokeLater(() -> frame.setChatHistory(message.getChatHistory()));
         } else if (message.getType() == MessageType.USER_LIST) {
             SwingUtilities.invokeLater(() -> frame.setUsers(message.getUsers()));
         } else if (message.getType() == MessageType.APPROVAL_REQUEST) {
@@ -194,11 +200,11 @@ public class WhiteboardClient {
 
         File selectedFile = chooser.getSelectedFile();
         try {
-            List<DrawingElement> loadedElements = readDrawingElements(selectedFile);
+            List<DrawingElement> loadedElements = loadDrawingElements(selectedFile);
             currentFile = selectedFile;
             send(WhiteboardMessage.replaceBoard(loadedElements));
             frame.addChatMessage("System: opened whiteboard from " + selectedFile.getName());
-        } catch (IOException | ClassNotFoundException exception) {
+        } catch (IOException exception) {
             showError("Could not open whiteboard: " + exception.getMessage());
         }
     }
@@ -220,6 +226,34 @@ public class WhiteboardClient {
 
         currentFile = chooser.getSelectedFile();
         writeDrawingElements(currentFile);
+    }
+
+    private void exportPng() {
+        JFileChooser chooser = new JFileChooser();
+        int answer = chooser.showSaveDialog(frame);
+        if (answer != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File selectedFile = ensurePngExtension(chooser.getSelectedFile());
+        BufferedImage image = new BufferedImage(canvas.getWidth(), canvas.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = image.createGraphics();
+        canvas.paint(graphics);
+        graphics.dispose();
+
+        try {
+            ImageIO.write(image, "png", selectedFile);
+            frame.addChatMessage("System: exported image to " + selectedFile.getName());
+        } catch (IOException exception) {
+            showError("Could not export PNG: " + exception.getMessage());
+        }
+    }
+
+    private File ensurePngExtension(File file) {
+        if (file.getName().toLowerCase().endsWith(".png")) {
+            return file;
+        }
+        return new File(file.getParentFile(), file.getName() + ".png");
     }
 
     private void closeBoard() {
@@ -269,7 +303,19 @@ public class WhiteboardClient {
         }
     }
 
-    private List<DrawingElement> readDrawingElements(File file) throws IOException, ClassNotFoundException {
+    private List<DrawingElement> loadDrawingElements(File file) throws IOException {
+        try {
+            return WhiteboardFileCodec.load(file.toPath());
+        } catch (IOException textFormatException) {
+            try {
+                return readSerializedDrawingElements(file);
+            } catch (IOException | ClassNotFoundException serializedException) {
+                throw new IOException("File is not a valid whiteboard save file.");
+            }
+        }
+    }
+
+    private List<DrawingElement> readSerializedDrawingElements(File file) throws IOException, ClassNotFoundException {
         try (ObjectInputStream fileInput = new ObjectInputStream(new FileInputStream(file))) {
             Object object = fileInput.readObject();
             if (object instanceof WhiteboardState whiteboardState) {
@@ -291,8 +337,8 @@ public class WhiteboardClient {
     }
 
     private void writeDrawingElements(File file) {
-        try (ObjectOutputStream fileOutput = new ObjectOutputStream(new FileOutputStream(file))) {
-            fileOutput.writeObject(new WhiteboardState(canvas.getElementsCopy()));
+        try {
+            WhiteboardFileCodec.save(file.toPath(), canvas.getElementsCopy());
             frame.addChatMessage("System: saved whiteboard to " + file.getName());
         } catch (IOException exception) {
             showError("Could not save whiteboard: " + exception.getMessage());
