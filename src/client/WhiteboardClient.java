@@ -1,6 +1,7 @@
 package client;
 
 import model.DrawingElement;
+import model.WhiteboardState;
 import protocol.MessageType;
 import protocol.WhiteboardMessage;
 import ui.DrawingCanvas;
@@ -102,11 +103,11 @@ public class WhiteboardClient {
         } else if (message.getType() == MessageType.APPROVAL_REQUEST) {
             askManagerForApproval(message.getUsername());
         } else if (message.getType() == MessageType.KICKED) {
-            showError(message.getText());
+            showInfo(message.getText());
             close();
             SwingUtilities.invokeLater(frame::dispose);
         } else if (message.getType() == MessageType.SERVER_SHUTDOWN) {
-            showError(message.getText());
+            showInfo(message.getText());
             close();
             SwingUtilities.invokeLater(frame::dispose);
         } else if (message.getType() == MessageType.ERROR) {
@@ -177,7 +178,8 @@ public class WhiteboardClient {
         }
 
         try {
-            send(WhiteboardMessage.replaceBoard(List.of()));
+            send(WhiteboardMessage.newBoard());
+            currentFile = null;
         } catch (IOException exception) {
             showError("Could not create a new whiteboard: " + exception.getMessage());
         }
@@ -195,6 +197,7 @@ public class WhiteboardClient {
             List<DrawingElement> loadedElements = readDrawingElements(selectedFile);
             currentFile = selectedFile;
             send(WhiteboardMessage.replaceBoard(loadedElements));
+            frame.addChatMessage("System: opened whiteboard from " + selectedFile.getName());
         } catch (IOException | ClassNotFoundException exception) {
             showError("Could not open whiteboard: " + exception.getMessage());
         }
@@ -269,8 +272,11 @@ public class WhiteboardClient {
     private List<DrawingElement> readDrawingElements(File file) throws IOException, ClassNotFoundException {
         try (ObjectInputStream fileInput = new ObjectInputStream(new FileInputStream(file))) {
             Object object = fileInput.readObject();
+            if (object instanceof WhiteboardState whiteboardState) {
+                return whiteboardState.getElements();
+            }
             if (!(object instanceof List<?> loadedList)) {
-                throw new IOException("File does not contain a whiteboard drawing list.");
+                throw new IOException("File does not contain a valid whiteboard state.");
             }
 
             List<DrawingElement> elements = new ArrayList<>();
@@ -286,7 +292,7 @@ public class WhiteboardClient {
 
     private void writeDrawingElements(File file) {
         try (ObjectOutputStream fileOutput = new ObjectOutputStream(new FileOutputStream(file))) {
-            fileOutput.writeObject(canvas.getElementsCopy());
+            fileOutput.writeObject(new WhiteboardState(canvas.getElementsCopy()));
             frame.addChatMessage("System: saved whiteboard to " + file.getName());
         } catch (IOException exception) {
             showError("Could not save whiteboard: " + exception.getMessage());
@@ -309,6 +315,15 @@ public class WhiteboardClient {
                 message,
                 "Whiteboard Connection",
                 JOptionPane.ERROR_MESSAGE
+        ));
+    }
+
+    private void showInfo(String message) {
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                frame,
+                message,
+                "Whiteboard",
+                JOptionPane.INFORMATION_MESSAGE
         ));
     }
 }

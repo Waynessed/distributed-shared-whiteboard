@@ -66,6 +66,10 @@ public class WhiteboardMessage implements Serializable {
         return new WhiteboardMessage(MessageType.CHAT, username, text, null, null, null, false, false);
     }
 
+    public static WhiteboardMessage newBoard() {
+        return new WhiteboardMessage(MessageType.NEW_BOARD, null, null, null, null, null, false, false);
+    }
+
     public static WhiteboardMessage userList(List<String> users) {
         return new WhiteboardMessage(MessageType.USER_LIST, null, null, null, null, users, false, false);
     }

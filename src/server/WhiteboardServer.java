@@ -11,6 +11,7 @@ import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,8 +45,18 @@ public class WhiteboardServer implements Runnable {
                 ClientHandler handler = new ClientHandler(socket);
                 new Thread(handler, "whiteboard-client-handler").start();
             }
+        } catch (SocketException exception) {
+            if (running) {
+                System.err.println("Server socket error: " + exception.getMessage());
+            } else {
+                System.out.println("Server shut down by manager.");
+            }
         } catch (IOException exception) {
-            System.err.println("Server stopped: " + exception.getMessage());
+            if (running) {
+                System.err.println("Server error: " + exception.getMessage());
+            } else {
+                System.out.println("Server shut down by manager.");
+            }
         }
     }
 
@@ -88,6 +99,22 @@ public class WhiteboardServer implements Runnable {
             drawingState.clear();
             drawingState.addAll(newState);
             broadcast(WhiteboardMessage.state(drawingState));
+        }
+    }
+
+    private void handleNewBoard(ClientHandler requester) {
+        synchronized (stateLock) {
+            if (requester != manager) {
+                try {
+                    requester.send(WhiteboardMessage.error("Only the manager can create a new board."));
+                } catch (IOException ignored) {
+                }
+                return;
+            }
+
+            drawingState.clear();
+            broadcast(WhiteboardMessage.state(drawingState));
+            broadcast(WhiteboardMessage.chat("System", "The manager created a new whiteboard."));
         }
     }
 
@@ -195,6 +222,7 @@ public class WhiteboardServer implements Runnable {
         private ObjectInputStream input;
         private String username = "unknown";
         private boolean managerClient;
+        private boolean intentionalClose;
 
         ClientHandler(Socket socket) {
             this.socket = socket;
@@ -227,9 +255,13 @@ public class WhiteboardServer implements Runnable {
                     }
                 }
             } catch (EOFException exception) {
-                System.out.println(username + " disconnected.");
+                if (!intentionalClose) {
+                    System.out.println(username + " disconnected.");
+                }
             } catch (IOException | ClassNotFoundException exception) {
-                System.err.println("Client error for " + username + ": " + exception.getMessage());
+                if (!intentionalClose && running) {
+                    System.err.println("Client error for " + username + ": " + exception.getMessage());
+                }
             } finally {
                 removeClient(this);
                 closeSocket();
@@ -295,6 +327,8 @@ public class WhiteboardServer implements Runnable {
                 handleDrawing(message.getDrawingElement());
             } else if (message.getType() == MessageType.CHAT) {
                 handleChat(message);
+            } else if (message.getType() == MessageType.NEW_BOARD) {
+                handleNewBoard(this);
             } else if (message.getType() == MessageType.APPROVAL_RESPONSE && managerClient) {
                 handleApprovalResponse(message);
             } else if (message.getType() == MessageType.KICK) {
@@ -315,6 +349,7 @@ public class WhiteboardServer implements Runnable {
         }
 
         private void closeSocket() {
+            intentionalClose = true;
             try {
                 socket.close();
             } catch (IOException ignored) {

@@ -8,6 +8,7 @@ public enum MessageType {
     STATE,
     DRAW,
     CHAT,
+    NEW_BOARD,
     USER_LIST,
     APPROVAL_REQUEST,
     APPROVAL_RESPONSE,
