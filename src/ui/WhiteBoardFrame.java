@@ -9,8 +9,13 @@ import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JToolBar;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -31,7 +36,16 @@ public class WhiteBoardFrame extends JFrame {
     private final DefaultListModel<String> userListModel = new DefaultListModel<>();
     private final JList<String> userList = new JList<>(userListModel);
     private final JButton kickButton = new JButton("Kick User");
+    private final JMenu fileMenu = new JMenu("File");
+    private final JTextArea chatArea = new JTextArea(8, 22);
+    private final JTextField chatInput = new JTextField();
     private Consumer<String> kickListener;
+    private Consumer<String> chatListener;
+    private Runnable newBoardListener;
+    private Runnable openBoardListener;
+    private Runnable saveBoardListener;
+    private Runnable saveAsBoardListener;
+    private Runnable closeBoardListener;
 
     public WhiteBoardFrame() {
         this("Standalone Shared Whiteboard - Phase 1A", true);
@@ -41,10 +55,12 @@ public class WhiteBoardFrame extends JFrame {
         super(title);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+        setJMenuBar(createMenuBar());
 
         add(createToolBar(showClearButton), BorderLayout.NORTH);
         add(new JScrollPane(canvas), BorderLayout.CENTER);
         add(createUserPanel(), BorderLayout.EAST);
+        add(createChatPanel(), BorderLayout.WEST);
         add(createColorPanel(), BorderLayout.SOUTH);
 
         pack();
@@ -64,10 +80,34 @@ public class WhiteBoardFrame extends JFrame {
 
     public void setManagerMode(boolean managerMode) {
         kickButton.setEnabled(managerMode);
+        fileMenu.setEnabled(managerMode);
     }
 
     public void setKickListener(Consumer<String> kickListener) {
         this.kickListener = kickListener;
+    }
+
+    public void setChatListener(Consumer<String> chatListener) {
+        this.chatListener = chatListener;
+    }
+
+    public void setFileActionListeners(
+            Runnable newBoardListener,
+            Runnable openBoardListener,
+            Runnable saveBoardListener,
+            Runnable saveAsBoardListener,
+            Runnable closeBoardListener
+    ) {
+        this.newBoardListener = newBoardListener;
+        this.openBoardListener = openBoardListener;
+        this.saveBoardListener = saveBoardListener;
+        this.saveAsBoardListener = saveAsBoardListener;
+        this.closeBoardListener = closeBoardListener;
+    }
+
+    public void addChatMessage(String message) {
+        chatArea.append(message + System.lineSeparator());
+        chatArea.setCaretPosition(chatArea.getDocument().getLength());
     }
 
     private JToolBar createToolBar(boolean showClearButton) {
@@ -108,6 +148,30 @@ public class WhiteBoardFrame extends JFrame {
         return toolbar;
     }
 
+    private JMenuBar createMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        fileMenu.setEnabled(false);
+        addMenuItem("New", () -> runIfSet(newBoardListener));
+        addMenuItem("Open", () -> runIfSet(openBoardListener));
+        addMenuItem("Save", () -> runIfSet(saveBoardListener));
+        addMenuItem("Save As", () -> runIfSet(saveAsBoardListener));
+        addMenuItem("Close", () -> runIfSet(closeBoardListener));
+        menuBar.add(fileMenu);
+        return menuBar;
+    }
+
+    private void addMenuItem(String label, Runnable action) {
+        JMenuItem item = new JMenuItem(label);
+        item.addActionListener(event -> action.run());
+        fileMenu.add(item);
+    }
+
+    private void runIfSet(Runnable action) {
+        if (action != null) {
+            action.run();
+        }
+    }
+
     private JPanel createUserPanel() {
         JPanel panel = new JPanel(new BorderLayout(4, 4));
         panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -125,6 +189,37 @@ public class WhiteBoardFrame extends JFrame {
         panel.add(new JScrollPane(userList), BorderLayout.CENTER);
         panel.add(kickButton, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private JPanel createChatPanel() {
+        JPanel panel = new JPanel(new BorderLayout(4, 4));
+        panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        panel.setPreferredSize(new Dimension(230, 0));
+
+        chatArea.setEditable(false);
+        chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        chatInput.addActionListener(event -> sendChatMessage());
+
+        JButton sendButton = new JButton("Send");
+        sendButton.addActionListener(event -> sendChatMessage());
+
+        JPanel inputPanel = new JPanel(new BorderLayout(4, 4));
+        inputPanel.add(chatInput, BorderLayout.CENTER);
+        inputPanel.add(sendButton, BorderLayout.EAST);
+
+        panel.add(new JLabel("Chat"), BorderLayout.NORTH);
+        panel.add(new JScrollPane(chatArea), BorderLayout.CENTER);
+        panel.add(inputPanel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void sendChatMessage() {
+        String text = chatInput.getText().trim();
+        if (!text.isEmpty() && chatListener != null) {
+            chatListener.accept(text);
+            chatInput.setText("");
+        }
     }
 
     private JPanel createColorPanel() {

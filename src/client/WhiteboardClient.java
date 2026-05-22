@@ -6,13 +6,19 @@ import protocol.WhiteboardMessage;
 import ui.DrawingCanvas;
 import ui.WhiteBoardFrame;
 
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import java.io.EOFException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class WhiteboardClient {
     private final String username;
@@ -21,6 +27,7 @@ public class WhiteboardClient {
     private Socket socket;
     private ObjectOutputStream output;
     private ObjectInputStream input;
+    private File currentFile;
     private volatile boolean closing;
 
     public WhiteboardClient(String username, WhiteBoardFrame frame) {
@@ -37,6 +44,14 @@ public class WhiteboardClient {
 
         send(WhiteboardMessage.join(username));
         frame.setKickListener(this::kickUser);
+        frame.setChatListener(this::sendChat);
+        frame.setFileActionListeners(
+                this::newBoard,
+                this::openBoard,
+                this::saveBoard,
+                this::saveBoardAs,
+                this::closeBoard
+        );
 
         Thread listenerThread = new Thread(this::listenForMessages, "whiteboard-client-listener");
         listenerThread.setDaemon(true);
@@ -77,11 +92,17 @@ public class WhiteboardClient {
         } else if (message.getType() == MessageType.DRAW) {
             DrawingElement element = message.getDrawingElement();
             SwingUtilities.invokeLater(() -> canvas.addRemoteElement(element));
+        } else if (message.getType() == MessageType.CHAT) {
+            SwingUtilities.invokeLater(() -> frame.addChatMessage(message.getUsername() + ": " + message.getText()));
         } else if (message.getType() == MessageType.USER_LIST) {
             SwingUtilities.invokeLater(() -> frame.setUsers(message.getUsers()));
         } else if (message.getType() == MessageType.APPROVAL_REQUEST) {
             askManagerForApproval(message.getUsername());
         } else if (message.getType() == MessageType.KICKED) {
+            showError(message.getText());
+            close();
+            SwingUtilities.invokeLater(frame::dispose);
+        } else if (message.getType() == MessageType.SERVER_SHUTDOWN) {
             showError(message.getText());
             close();
             SwingUtilities.invokeLater(frame::dispose);
@@ -115,6 +136,14 @@ public class WhiteboardClient {
         }
     }
 
+    private void sendChat(String text) {
+        try {
+            send(WhiteboardMessage.chat(username, text));
+        } catch (IOException exception) {
+            showError("Could not send chat message: " + exception.getMessage());
+        }
+    }
+
     private synchronized void send(WhiteboardMessage message) throws IOException {
         output.writeObject(message);
         output.flush();
@@ -130,6 +159,105 @@ public class WhiteboardClient {
             send(WhiteboardMessage.kick(usernameToKick));
         } catch (IOException exception) {
             showError("Could not send kick request: " + exception.getMessage());
+        }
+    }
+
+    private void newBoard() {
+        int answer = JOptionPane.showConfirmDialog(
+                frame,
+                "Clear the shared whiteboard for all users?",
+                "New Whiteboard",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            send(WhiteboardMessage.replaceBoard(List.of()));
+        } catch (IOException exception) {
+            showError("Could not create a new whiteboard: " + exception.getMessage());
+        }
+    }
+
+    private void openBoard() {
+        JFileChooser chooser = new JFileChooser();
+        int answer = chooser.showOpenDialog(frame);
+        if (answer != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File selectedFile = chooser.getSelectedFile();
+        try {
+            List<DrawingElement> loadedElements = readDrawingElements(selectedFile);
+            currentFile = selectedFile;
+            send(WhiteboardMessage.replaceBoard(loadedElements));
+        } catch (IOException | ClassNotFoundException exception) {
+            showError("Could not open whiteboard: " + exception.getMessage());
+        }
+    }
+
+    private void saveBoard() {
+        if (currentFile == null) {
+            saveBoardAs();
+            return;
+        }
+        writeDrawingElements(currentFile);
+    }
+
+    private void saveBoardAs() {
+        JFileChooser chooser = new JFileChooser();
+        int answer = chooser.showSaveDialog(frame);
+        if (answer != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        currentFile = chooser.getSelectedFile();
+        writeDrawingElements(currentFile);
+    }
+
+    private void closeBoard() {
+        int answer = JOptionPane.showConfirmDialog(
+                frame,
+                "Close the shared whiteboard for all users?",
+                "Close Whiteboard",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            send(WhiteboardMessage.serverShutdown("The manager closed the whiteboard."));
+        } catch (IOException exception) {
+            showError("Could not close whiteboard: " + exception.getMessage());
+        }
+    }
+
+    private List<DrawingElement> readDrawingElements(File file) throws IOException, ClassNotFoundException {
+        try (ObjectInputStream fileInput = new ObjectInputStream(new FileInputStream(file))) {
+            Object object = fileInput.readObject();
+            if (!(object instanceof List<?> loadedList)) {
+                throw new IOException("File does not contain a whiteboard drawing list.");
+            }
+
+            List<DrawingElement> elements = new ArrayList<>();
+            for (Object item : loadedList) {
+                if (!(item instanceof DrawingElement element)) {
+                    throw new IOException("File contains an invalid drawing item.");
+                }
+                elements.add(element);
+            }
+            return elements;
+        }
+    }
+
+    private void writeDrawingElements(File file) {
+        try (ObjectOutputStream fileOutput = new ObjectOutputStream(new FileOutputStream(file))) {
+            fileOutput.writeObject(canvas.getElementsCopy());
+            frame.addChatMessage("System: saved whiteboard to " + file.getName());
+        } catch (IOException exception) {
+            showError("Could not save whiteboard: " + exception.getMessage());
         }
     }
 

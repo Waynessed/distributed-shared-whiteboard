@@ -78,6 +78,10 @@ public class DrawingCanvas extends JPanel {
         repaint();
     }
 
+    public List<DrawingElement> getElementsCopy() {
+        return new ArrayList<>(elements);
+    }
+
     public void clear() {
         elements.clear();
         activeElement = null;

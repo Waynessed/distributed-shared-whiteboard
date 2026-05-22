@@ -26,6 +26,8 @@ public class WhiteboardServer implements Runnable {
     private final List<ClientHandler> clients = new ArrayList<>();
     private final Map<String, PendingJoin> pendingJoins = new HashMap<>();
     private ClientHandler manager;
+    private ServerSocket serverSocket;
+    private boolean running = true;
 
     public WhiteboardServer(String host, int port) {
         this.host = host;
@@ -34,10 +36,11 @@ public class WhiteboardServer implements Runnable {
 
     @Override
     public void run() {
-        try (ServerSocket serverSocket = new ServerSocket(port, 50, InetAddress.getByName(host))) {
+        try (ServerSocket openedSocket = new ServerSocket(port, 50, InetAddress.getByName(host))) {
+            serverSocket = openedSocket;
             System.out.println("Whiteboard server listening on " + host + ":" + port);
-            while (true) {
-                Socket socket = serverSocket.accept();
+            while (running) {
+                Socket socket = openedSocket.accept();
                 ClientHandler handler = new ClientHandler(socket);
                 new Thread(handler, "whiteboard-client-handler").start();
             }
@@ -63,6 +66,48 @@ public class WhiteboardServer implements Runnable {
                 drawingState.add(element);
             }
             broadcast(WhiteboardMessage.draw(null, element));
+        }
+    }
+
+    private void handleChat(WhiteboardMessage message) {
+        synchronized (stateLock) {
+            broadcast(WhiteboardMessage.chat(message.getUsername(), message.getText()));
+        }
+    }
+
+    private void handleReplaceBoard(ClientHandler requester, List<DrawingElement> newState) {
+        synchronized (stateLock) {
+            if (requester != manager) {
+                try {
+                    requester.send(WhiteboardMessage.error("Only the manager can change the board file."));
+                } catch (IOException ignored) {
+                }
+                return;
+            }
+
+            drawingState.clear();
+            drawingState.addAll(newState);
+            broadcast(WhiteboardMessage.state(drawingState));
+        }
+    }
+
+    private void handleServerShutdown(ClientHandler requester) {
+        synchronized (stateLock) {
+            if (requester != manager) {
+                try {
+                    requester.send(WhiteboardMessage.error("Only the manager can close the whiteboard."));
+                } catch (IOException ignored) {
+                }
+                return;
+            }
+
+            running = false;
+            broadcast(WhiteboardMessage.serverShutdown("The manager closed the whiteboard."));
+            for (ClientHandler client : new ArrayList<>(clients)) {
+                client.closeSocket();
+            }
+            clients.clear();
+            closeServerSocket();
         }
     }
 
@@ -241,10 +286,16 @@ public class WhiteboardServer implements Runnable {
         private void handleClientMessage(WhiteboardMessage message) {
             if (message.getType() == MessageType.DRAW) {
                 handleDrawing(message.getDrawingElement());
+            } else if (message.getType() == MessageType.CHAT) {
+                handleChat(message);
             } else if (message.getType() == MessageType.APPROVAL_RESPONSE && managerClient) {
                 handleApprovalResponse(message);
             } else if (message.getType() == MessageType.KICK) {
                 handleKick(this, message.getUsername());
+            } else if (message.getType() == MessageType.REPLACE_BOARD) {
+                handleReplaceBoard(this, message.getDrawingState());
+            } else if (message.getType() == MessageType.SERVER_SHUTDOWN) {
+                handleServerShutdown(this);
             }
         }
 
@@ -259,6 +310,15 @@ public class WhiteboardServer implements Runnable {
                 socket.close();
             } catch (IOException ignored) {
             }
+        }
+    }
+
+    private void closeServerSocket() {
+        try {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+        } catch (IOException ignored) {
         }
     }
 

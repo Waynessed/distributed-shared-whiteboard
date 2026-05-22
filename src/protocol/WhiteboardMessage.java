@@ -58,6 +58,10 @@ public class WhiteboardMessage implements Serializable {
         return new WhiteboardMessage(MessageType.DRAW, username, null, drawingElement, null, null, false, false);
     }
 
+    public static WhiteboardMessage chat(String username, String text) {
+        return new WhiteboardMessage(MessageType.CHAT, username, text, null, null, null, false, false);
+    }
+
     public static WhiteboardMessage userList(List<String> users) {
         return new WhiteboardMessage(MessageType.USER_LIST, null, null, null, null, users, false, false);
     }
@@ -76,6 +80,14 @@ public class WhiteboardMessage implements Serializable {
 
     public static WhiteboardMessage kicked(String reason) {
         return new WhiteboardMessage(MessageType.KICKED, null, reason, null, null, null, false, false);
+    }
+
+    public static WhiteboardMessage replaceBoard(List<DrawingElement> drawingState) {
+        return new WhiteboardMessage(MessageType.REPLACE_BOARD, null, null, null, drawingState, null, false, false);
+    }
+
+    public static WhiteboardMessage serverShutdown(String reason) {
+        return new WhiteboardMessage(MessageType.SERVER_SHUTDOWN, null, reason, null, null, null, false, false);
     }
 
     public static WhiteboardMessage error(String text) {
