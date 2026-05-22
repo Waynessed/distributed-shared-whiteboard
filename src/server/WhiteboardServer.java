@@ -111,6 +111,13 @@ public class WhiteboardServer implements Runnable {
         }
     }
 
+    private void handleLeave(ClientHandler client) {
+        synchronized (stateLock) {
+            removeClient(client);
+            client.closeSocket();
+        }
+    }
+
     private void handleApprovalResponse(WhiteboardMessage message) {
         synchronized (stateLock) {
             PendingJoin pendingJoin = pendingJoins.get(message.getUsername());
@@ -296,6 +303,8 @@ public class WhiteboardServer implements Runnable {
                 handleReplaceBoard(this, message.getDrawingState());
             } else if (message.getType() == MessageType.SERVER_SHUTDOWN) {
                 handleServerShutdown(this);
+            } else if (message.getType() == MessageType.LEAVE) {
+                handleLeave(this);
             }
         }
 

@@ -2,6 +2,7 @@ package protocol;
 
 public enum MessageType {
     JOIN,
+    LEAVE,
     JOIN_ACCEPTED,
     JOIN_REJECTED,
     STATE,

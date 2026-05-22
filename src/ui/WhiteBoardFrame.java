@@ -21,6 +21,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -36,6 +38,7 @@ public class WhiteBoardFrame extends JFrame {
     private final DefaultListModel<String> userListModel = new DefaultListModel<>();
     private final JList<String> userList = new JList<>(userListModel);
     private final JButton kickButton = new JButton("Kick User");
+    private final JButton quitButton = new JButton("Quit");
     private final JMenu fileMenu = new JMenu("File");
     private final JTextArea chatArea = new JTextArea(8, 22);
     private final JTextField chatInput = new JTextField();
@@ -46,6 +49,7 @@ public class WhiteBoardFrame extends JFrame {
     private Runnable saveBoardListener;
     private Runnable saveAsBoardListener;
     private Runnable closeBoardListener;
+    private Runnable quitListener;
 
     public WhiteBoardFrame() {
         this("Standalone Shared Whiteboard - Phase 1A", true);
@@ -53,7 +57,7 @@ public class WhiteBoardFrame extends JFrame {
 
     public WhiteBoardFrame(String title, boolean showClearButton) {
         super(title);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLayout(new BorderLayout());
         setJMenuBar(createMenuBar());
 
@@ -62,6 +66,12 @@ public class WhiteBoardFrame extends JFrame {
         add(createUserPanel(), BorderLayout.EAST);
         add(createChatPanel(), BorderLayout.WEST);
         add(createColorPanel(), BorderLayout.SOUTH);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent event) {
+                quit();
+            }
+        });
 
         pack();
         setLocationRelativeTo(null);
@@ -81,6 +91,7 @@ public class WhiteBoardFrame extends JFrame {
     public void setManagerMode(boolean managerMode) {
         kickButton.setEnabled(managerMode);
         fileMenu.setEnabled(managerMode);
+        quitButton.setText(managerMode ? "Close Board" : "Leave");
     }
 
     public void setKickListener(Consumer<String> kickListener) {
@@ -103,6 +114,10 @@ public class WhiteBoardFrame extends JFrame {
         this.saveBoardListener = saveBoardListener;
         this.saveAsBoardListener = saveAsBoardListener;
         this.closeBoardListener = closeBoardListener;
+    }
+
+    public void setQuitListener(Runnable quitListener) {
+        this.quitListener = quitListener;
     }
 
     public void addChatMessage(String message) {
@@ -184,10 +199,15 @@ public class WhiteBoardFrame extends JFrame {
                 kickListener.accept(selectedUser);
             }
         });
+        quitButton.addActionListener(event -> quit());
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 4, 4));
+        buttonPanel.add(kickButton);
+        buttonPanel.add(quitButton);
 
         panel.add(new JLabel("Online Users"), BorderLayout.NORTH);
         panel.add(new JScrollPane(userList), BorderLayout.CENTER);
-        panel.add(kickButton, BorderLayout.SOUTH);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -219,6 +239,14 @@ public class WhiteBoardFrame extends JFrame {
         if (!text.isEmpty() && chatListener != null) {
             chatListener.accept(text);
             chatInput.setText("");
+        }
+    }
+
+    private void quit() {
+        if (quitListener != null) {
+            quitListener.run();
+        } else {
+            dispose();
         }
     }
 

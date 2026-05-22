@@ -42,6 +42,10 @@ public class WhiteboardMessage implements Serializable {
         return new WhiteboardMessage(MessageType.JOIN, username, null, null, null, null, false, false);
     }
 
+    public static WhiteboardMessage leave(String username) {
+        return new WhiteboardMessage(MessageType.LEAVE, username, null, null, null, null, false, false);
+    }
+
     public static WhiteboardMessage joinAccepted(boolean manager) {
         return new WhiteboardMessage(MessageType.JOIN_ACCEPTED, null, null, null, null, null, true, manager);
     }

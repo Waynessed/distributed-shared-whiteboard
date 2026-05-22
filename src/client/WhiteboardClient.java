@@ -28,6 +28,7 @@ public class WhiteboardClient {
     private ObjectOutputStream output;
     private ObjectInputStream input;
     private File currentFile;
+    private boolean managerClient;
     private volatile boolean closing;
 
     public WhiteboardClient(String username, WhiteBoardFrame frame) {
@@ -45,6 +46,7 @@ public class WhiteboardClient {
         send(WhiteboardMessage.join(username));
         frame.setKickListener(this::kickUser);
         frame.setChatListener(this::sendChat);
+        frame.setQuitListener(this::quitWhiteboard);
         frame.setFileActionListeners(
                 this::newBoard,
                 this::openBoard,
@@ -80,8 +82,9 @@ public class WhiteboardClient {
     private void handleMessage(WhiteboardMessage message) {
         if (message.getType() == MessageType.JOIN_ACCEPTED) {
             SwingUtilities.invokeLater(() -> {
+                managerClient = message.isManager();
                 canvas.setDrawingListener(this::sendDrawing);
-                frame.setManagerMode(message.isManager());
+                frame.setManagerMode(managerClient);
             });
         } else if (message.getType() == MessageType.JOIN_REJECTED) {
             showError(message.getText());
@@ -231,6 +234,35 @@ public class WhiteboardClient {
             send(WhiteboardMessage.serverShutdown("The manager closed the whiteboard."));
         } catch (IOException exception) {
             showError("Could not close whiteboard: " + exception.getMessage());
+        }
+    }
+
+    private void quitWhiteboard() {
+        if (managerClient) {
+            closeBoard();
+        } else {
+            leaveWhiteboard();
+        }
+    }
+
+    private void leaveWhiteboard() {
+        int answer = JOptionPane.showConfirmDialog(
+                frame,
+                "Leave the shared whiteboard?",
+                "Leave Whiteboard",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            send(WhiteboardMessage.leave(username));
+        } catch (IOException exception) {
+            showError("Could not notify server before leaving: " + exception.getMessage());
+        } finally {
+            close();
+            SwingUtilities.invokeLater(frame::dispose);
         }
     }
 
