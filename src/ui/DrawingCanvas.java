@@ -22,6 +22,7 @@ public class DrawingCanvas extends JPanel {
     private DrawingTool currentTool = DrawingTool.FREE_DRAW;
     private Color currentColor = Color.BLACK;
     private int currentStrokeSize = 3;
+    private boolean drawingEnabled = true;
 
     public DrawingCanvas() {
         setBackground(Color.WHITE);
@@ -64,6 +65,14 @@ public class DrawingCanvas extends JPanel {
         this.drawingListener = drawingListener;
     }
 
+    public void setDrawingEnabled(boolean drawingEnabled) {
+        this.drawingEnabled = drawingEnabled;
+        if (!drawingEnabled) {
+            activeElement = null;
+            repaint();
+        }
+    }
+
     public void addRemoteElement(DrawingElement element) {
         if (!elements.contains(element)) {
             elements.add(element);
@@ -103,6 +112,10 @@ public class DrawingCanvas extends JPanel {
     }
 
     private void handleMousePressed(Point point) {
+        if (!drawingEnabled) {
+            return;
+        }
+
         if (currentTool == DrawingTool.TEXT) {
             addText(point);
             return;
@@ -120,7 +133,7 @@ public class DrawingCanvas extends JPanel {
     }
 
     private void handleMouseDragged(Point point) {
-        if (activeElement == null) {
+        if (!drawingEnabled || activeElement == null) {
             return;
         }
 
@@ -134,7 +147,7 @@ public class DrawingCanvas extends JPanel {
     }
 
     private void handleMouseReleased(Point point) {
-        if (activeElement == null) {
+        if (!drawingEnabled || activeElement == null) {
             return;
         }
 

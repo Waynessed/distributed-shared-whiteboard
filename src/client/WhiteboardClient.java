@@ -39,6 +39,7 @@ public class WhiteboardClient {
         this.username = username;
         this.frame = frame;
         this.canvas = frame.getCanvas();
+        canvas.setDrawingEnabled(false);
     }
 
     public void connect(String host, int port) throws IOException {
@@ -89,6 +90,7 @@ public class WhiteboardClient {
             SwingUtilities.invokeLater(() -> {
                 managerClient = message.isManager();
                 canvas.setDrawingListener(this::sendDrawing);
+                canvas.setDrawingEnabled(true);
                 frame.setManagerMode(managerClient);
             });
         } else if (message.getType() == MessageType.JOIN_REJECTED) {
