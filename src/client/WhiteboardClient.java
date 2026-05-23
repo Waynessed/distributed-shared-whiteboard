@@ -113,9 +113,16 @@ public class WhiteboardClient {
             close();
             SwingUtilities.invokeLater(frame::dispose);
         } else if (message.getType() == MessageType.SERVER_SHUTDOWN) {
-            showInfo(message.getText());
             close();
-            SwingUtilities.invokeLater(frame::dispose);
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(
+                        frame,
+                        message.getText(),
+                        "Whiteboard",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+                frame.dispose();
+            });
         } else if (message.getType() == MessageType.ERROR) {
             showError(message.getText());
         }
